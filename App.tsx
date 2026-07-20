@@ -1,11 +1,15 @@
 import { StatusBar } from 'expo-status-bar';
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
+import * as NavigationBar from 'expo-navigation-bar';
 import * as Sharing from 'expo-sharing';
 import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  AppState,
+  BackHandler,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -86,20 +90,42 @@ function AppContent() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (screen !== 'home') {
+        setScreen('home');
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [screen]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const hideNavigation = () => NavigationBar.setVisibilityAsync('hidden').catch(() => undefined);
+    hideNavigation();
+    const keyboardSubscription = Keyboard.addListener('keyboardDidHide', hideNavigation);
+    const appStateSubscription = AppState.addEventListener('change', (state) => state === 'active' && hideNavigation());
+    return () => { keyboardSubscription.remove(); appStateSubscription.remove(); };
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="dark" />
-      {screen === 'home' ? (
-        <Home now={now} onNavigate={setScreen} />
-      ) : (
-        <View style={styles.page}>
-          <Header title={{ food: '오늘의 음식', exercise: '오늘의 운동', stats: '기록 통계', settings: '설정' }[screen]} onBack={() => setScreen('home')} />
-          {screen === 'food' && <FoodScreen selectedDate={dateKey()} />}
-          {screen === 'exercise' && <ExerciseScreen selectedDate={dateKey()} />}
-          {screen === 'stats' && <StatsScreen />}
-          {screen === 'settings' && <SettingsScreen />}
-        </View>
-      )}
+      <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        {screen === 'home' ? (
+          <Home now={now} onNavigate={setScreen} />
+        ) : (
+          <View style={styles.page}>
+            <Header title={{ food: '오늘의 음식', exercise: '오늘의 운동', stats: '기록 통계', settings: '설정' }[screen]} onBack={() => setScreen('home')} />
+            {screen === 'food' && <FoodScreen selectedDate={dateKey()} />}
+            {screen === 'exercise' && <ExerciseScreen selectedDate={dateKey()} />}
+            {screen === 'stats' && <StatsScreen />}
+            {screen === 'settings' && <SettingsScreen />}
+          </View>
+        )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -226,8 +252,8 @@ function ExerciseScreen({ selectedDate }: { selectedDate: string }) {
 
   const amountMax = category === '런닝' ? 10 : 5;
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
         <SectionIntro title="어떤 운동을 했나요?" text="종목과 세부 내용을 선택해 기록하세요." />
         <Text style={styles.fieldLabel}>운동 종목</Text>
         <ChoiceGrid values={WORKOUT_TYPES} selected={type} onSelect={(value) => chooseType(value as WorkoutType)} />
@@ -267,7 +293,7 @@ function ExerciseScreen({ selectedDate }: { selectedDate: string }) {
         )}
         <PrimaryButton label="운동 기록 저장" onPress={save} />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -288,7 +314,7 @@ function StatsScreen() {
   const [tab, setTab] = useState<StatsTab>('food');
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
+    <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
       <Calendar month={month} selected={selectedDate} onSelect={setSelectedDate} onMonth={setMonth} />
       <View style={styles.tabs}>
         {(['food', 'exercise'] as StatsTab[]).map((value) => (
@@ -339,6 +365,18 @@ function DailyStats({ selectedDate, tab }: { selectedDate: string; tab: StatsTab
   const [editingWorkout, setEditingWorkout] = useState<WorkoutRow | null>(null);
   const [addingWorkout, setAddingWorkout] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (editingWorkout || addingWorkout) {
+        setEditingWorkout(null);
+        setAddingWorkout(false);
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [editingWorkout, addingWorkout]);
 
   useEffect(() => {
     const load = async () => {
