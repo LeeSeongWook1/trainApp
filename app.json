@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "trainApp",
-    "slug": "trainApp",
+    "name": "오늘운동",
+    "slug": "daily-training-log",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,6 +16,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.dailytraining.log",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,6 +26,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0d91ae10-994b-4e85-8da6-5934ad011d50"
+      }
     }
   }
 }
