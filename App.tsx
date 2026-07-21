@@ -34,6 +34,8 @@ type WorkoutRow = {
   amount: number | null;
   completed: number;
 };
+type CalendarWorkoutRow = { log_date: string; workout_type: '주짓수' | '유도' };
+type CalendarMarkers = Record<string, { jiuJitsu: boolean; judo: boolean }>;
 
 const NUTRIENTS = ['비타민 C', '비타민 D', '오메가3', '마그네슘', '크레아틴', '아연', '단백질'];
 const WORKOUT_TYPES: WorkoutType[] = ['주짓수', '유도', '유산소', '튜브', '기타'];
@@ -310,12 +312,37 @@ function ChoiceGrid({ values, selected, onSelect }: { values: string[]; selected
 }
 
 function StatsScreen() {
+  const db = useSQLiteContext();
   const [selectedDate, setSelectedDate] = useState(dateKey());
   const [tab, setTab] = useState<StatsTab>('food');
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [markers, setMarkers] = useState<CalendarMarkers>({});
+  const [markerRefreshKey, setMarkerRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const loadMarkers = async () => {
+      const monthStart = dateKey(month);
+      const monthEnd = dateKey(new Date(month.getFullYear(), month.getMonth() + 1, 1));
+      const rows = await db.getAllAsync<CalendarWorkoutRow>(
+        `SELECT DISTINCT log_date, workout_type
+         FROM workout_logs
+         WHERE log_date >= ? AND log_date < ? AND workout_type IN ('주짓수', '유도')`,
+        monthStart, monthEnd
+      );
+      const next: CalendarMarkers = {};
+      rows.forEach((row) => {
+        next[row.log_date] ??= { jiuJitsu: false, judo: false };
+        if (row.workout_type === '주짓수') next[row.log_date].jiuJitsu = true;
+        if (row.workout_type === '유도') next[row.log_date].judo = true;
+      });
+      setMarkers(next);
+    };
+    loadMarkers();
+  }, [db, month, markerRefreshKey]);
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
-      <Calendar month={month} selected={selectedDate} onSelect={setSelectedDate} onMonth={setMonth} />
+      <Calendar month={month} selected={selectedDate} markers={markers} onSelect={setSelectedDate} onMonth={setMonth} />
       <View style={styles.tabs}>
         {(['food', 'exercise'] as StatsTab[]).map((value) => (
           <Pressable key={value} onPress={() => setTab(value)} style={[styles.tab, tab === value && styles.tabSelected]}>
@@ -323,12 +350,12 @@ function StatsScreen() {
           </Pressable>
         ))}
       </View>
-      <DailyStats selectedDate={selectedDate} tab={tab} />
+      <DailyStats selectedDate={selectedDate} tab={tab} onWorkoutChanged={() => setMarkerRefreshKey((value) => value + 1)} />
     </ScrollView>
   );
 }
 
-function Calendar({ month, selected, onSelect, onMonth }: { month: Date; selected: string; onSelect: (date: string) => void; onMonth: (date: Date) => void }) {
+function Calendar({ month, selected, markers, onSelect, onMonth }: { month: Date; selected: string; markers: CalendarMarkers; onSelect: (date: string) => void; onMonth: (date: Date) => void }) {
   const cells = useMemo(() => {
     const start = month.getDay();
     const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
@@ -348,16 +375,25 @@ function Calendar({ month, selected, onSelect, onMonth }: { month: Date; selecte
           if (!day) return <View key={`empty-${index}`} style={styles.dayCell} />;
           const key = `${month.getFullYear()}-${pad(month.getMonth() + 1)}-${pad(day)}`;
           const active = key === selected;
+          const marker = markers[key];
           return <Pressable key={key} onPress={() => onSelect(key)} style={[styles.dayCell, active && styles.daySelected]}>
             <Text style={[styles.dayText, active && styles.dayTextSelected]}>{day}</Text>
+            <View style={styles.calendarDots}>
+              {marker?.jiuJitsu && <View style={[styles.calendarDot, styles.jiuJitsuDot, active && styles.activeCalendarDot]} />}
+              {marker?.judo && <View style={[styles.calendarDot, styles.judoDot, active && styles.activeCalendarDot]} />}
+            </View>
           </Pressable>;
         })}
+      </View>
+      <View style={styles.calendarLegend}>
+        <View style={styles.legendItem}><View style={[styles.calendarDot, styles.jiuJitsuDot]} /><Text style={styles.legendText}>주짓수</Text></View>
+        <View style={styles.legendItem}><View style={[styles.calendarDot, styles.judoDot]} /><Text style={styles.legendText}>유도</Text></View>
       </View>
     </View>
   );
 }
 
-function DailyStats({ selectedDate, tab }: { selectedDate: string; tab: StatsTab }) {
+function DailyStats({ selectedDate, tab, onWorkoutChanged }: { selectedDate: string; tab: StatsTab; onWorkoutChanged: () => void }) {
   const db = useSQLiteContext();
   const [nutrition, setNutrition] = useState<NutritionRow[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutRow[]>([]);
@@ -397,6 +433,7 @@ function DailyStats({ selectedDate, tab }: { selectedDate: string; tab: StatsTab
   }, [selectedDate, tab]);
 
   const reload = () => setRefreshKey((value) => value + 1);
+  const reloadWorkouts = () => { reload(); onWorkoutChanged(); };
   const savePastFood = async () => {
     await db.withTransactionAsync(async () => {
       for (const item of NUTRIENTS) {
@@ -443,7 +480,7 @@ function DailyStats({ selectedDate, tab }: { selectedDate: string; tab: StatsTab
               selectedDate={selectedDate}
               existing={editingWorkout}
               onCancel={() => { setAddingWorkout(false); setEditingWorkout(null); }}
-              onSaved={() => { setAddingWorkout(false); setEditingWorkout(null); reload(); }}
+              onSaved={() => { setAddingWorkout(false); setEditingWorkout(null); reloadWorkouts(); }}
             />
           )}
           {!addingWorkout && !editingWorkout && (workouts.length === 0 ? <Empty text="저장된 운동 기록이 없습니다." /> : workouts.map((row) => (
@@ -735,6 +772,8 @@ const styles = StyleSheet.create({
   tubeToggle: { minHeight: 88, marginTop: 24, padding: 18, borderRadius: 20, borderWidth: 1, flexDirection: 'row', alignItems: 'center' }, tubeIcon: { width: 42, height: 42, borderRadius: 21, overflow: 'hidden', textAlign: 'center', textAlignVertical: 'center', backgroundColor: '#FFFFFF', color: colors.green, fontSize: 24, fontWeight: '900', marginRight: 14 }, muted: { color: '#77807B', fontSize: 13, marginTop: 3 },
   calendar: { backgroundColor: '#FFFFFF', borderRadius: 24, borderWidth: 1, borderColor: colors.border, padding: 14 }, calendarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, marginBottom: 12 }, monthArrow: { fontSize: 32, color: colors.ink, paddingHorizontal: 8 }, monthTitle: { color: colors.ink, fontSize: 17, fontWeight: '900' },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' }, weekday: { width: '14.285%', textAlign: 'center', color: '#7A837E', fontSize: 12, fontWeight: '800', marginBottom: 7 }, dayCell: { width: '14.285%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 20 }, daySelected: { backgroundColor: colors.green }, dayText: { color: colors.ink, fontSize: 14, fontWeight: '700' }, dayTextSelected: { color: '#FFFFFF', fontWeight: '900' },
+  calendarDots: { position: 'absolute', bottom: 4, minHeight: 7, flexDirection: 'row', alignItems: 'center', gap: 3 }, calendarDot: { width: 6, height: 6, borderRadius: 3 }, jiuJitsuDot: { backgroundColor: '#E86A5A' }, judoDot: { backgroundColor: '#3977D6' }, activeCalendarDot: { borderWidth: 1, borderColor: '#FFFFFF' },
+  calendarLegend: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 18, paddingTop: 11, marginTop: 5, borderTopWidth: 1, borderTopColor: '#EDF0EE' }, legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 }, legendText: { color: '#707974', fontSize: 12, fontWeight: '700' },
   tabs: { flexDirection: 'row', backgroundColor: '#EBEFEC', padding: 4, borderRadius: 15, marginTop: 18, marginBottom: 18 }, tab: { flex: 1, minHeight: 43, alignItems: 'center', justifyContent: 'center', borderRadius: 12 }, tabSelected: { backgroundColor: '#FFFFFF' }, tabText: { color: '#707974', fontWeight: '800' }, tabTextSelected: { color: colors.green },
   statsTitleRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }, statsDate: { color: colors.ink, fontSize: 17, fontWeight: '900' },
   addRecordButton: { paddingHorizontal: 12, minHeight: 36, borderRadius: 12, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' }, addRecordText: { color: colors.green, fontSize: 13, fontWeight: '900' },
