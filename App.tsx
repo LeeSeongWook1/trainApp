@@ -377,10 +377,12 @@ function Calendar({ month, selected, markers, onSelect, onMonth }: { month: Date
           const active = key === selected;
           const marker = markers[key];
           return <Pressable key={key} onPress={() => onSelect(key)} style={[styles.dayCell, active && styles.daySelected]}>
-            <Text style={[styles.dayText, active && styles.dayTextSelected]}>{day}</Text>
-            <View style={styles.calendarDots}>
-              {marker?.jiuJitsu && <View style={[styles.calendarDot, styles.jiuJitsuDot, active && styles.activeCalendarDot]} />}
-              {marker?.judo && <View style={[styles.calendarDot, styles.judoDot, active && styles.activeCalendarDot]} />}
+            <View style={styles.dayNumberWrap}>
+              <Text style={[styles.dayText, active && styles.dayTextSelected]}>{day}</Text>
+              <View style={styles.calendarDots}>
+                {marker?.jiuJitsu && <View style={[styles.calendarDot, styles.jiuJitsuDot]} />}
+                {marker?.judo && <View style={[styles.calendarDot, styles.judoDot]} />}
+              </View>
             </View>
           </Pressable>;
         })}
@@ -771,8 +773,8 @@ const styles = StyleSheet.create({
   textArea: { minHeight: 130, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: '#FFFFFF', padding: 16, color: colors.ink, fontSize: 15, lineHeight: 22 },
   tubeToggle: { minHeight: 88, marginTop: 24, padding: 18, borderRadius: 20, borderWidth: 1, flexDirection: 'row', alignItems: 'center' }, tubeIcon: { width: 42, height: 42, borderRadius: 21, overflow: 'hidden', textAlign: 'center', textAlignVertical: 'center', backgroundColor: '#FFFFFF', color: colors.green, fontSize: 24, fontWeight: '900', marginRight: 14 }, muted: { color: '#77807B', fontSize: 13, marginTop: 3 },
   calendar: { backgroundColor: '#FFFFFF', borderRadius: 24, borderWidth: 1, borderColor: colors.border, padding: 14 }, calendarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, marginBottom: 12 }, monthArrow: { fontSize: 32, color: colors.ink, paddingHorizontal: 8 }, monthTitle: { color: colors.ink, fontSize: 17, fontWeight: '900' },
-  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' }, weekday: { width: '14.285%', textAlign: 'center', color: '#7A837E', fontSize: 12, fontWeight: '800', marginBottom: 7 }, dayCell: { width: '14.285%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 20 }, daySelected: { backgroundColor: colors.green }, dayText: { color: colors.ink, fontSize: 14, fontWeight: '700' }, dayTextSelected: { color: '#FFFFFF', fontWeight: '900' },
-  calendarDots: { position: 'absolute', bottom: 4, minHeight: 7, flexDirection: 'row', alignItems: 'center', gap: 3 }, calendarDot: { width: 6, height: 6, borderRadius: 3 }, jiuJitsuDot: { backgroundColor: '#E86A5A' }, judoDot: { backgroundColor: '#3977D6' }, activeCalendarDot: { borderWidth: 1, borderColor: '#FFFFFF' },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' }, weekday: { width: '14.285%', textAlign: 'center', color: '#7A837E', fontSize: 12, fontWeight: '800', marginBottom: 7 }, dayCell: { width: '14.285%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 20 }, daySelected: { backgroundColor: colors.green }, dayNumberWrap: { position: 'relative', width: 32, height: 24, alignItems: 'center', justifyContent: 'center' }, dayText: { color: colors.ink, fontSize: 14, fontWeight: '700' }, dayTextSelected: { color: '#FFFFFF', fontWeight: '900' },
+  calendarDots: { position: 'absolute', top: 0, right: 0, minHeight: 5, flexDirection: 'row', alignItems: 'center', gap: 2 }, calendarDot: { width: 5, height: 5, borderRadius: 2.5 }, jiuJitsuDot: { backgroundColor: '#E86A5A' }, judoDot: { backgroundColor: '#3977D6' },
   calendarLegend: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 18, paddingTop: 11, marginTop: 5, borderTopWidth: 1, borderTopColor: '#EDF0EE' }, legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 }, legendText: { color: '#707974', fontSize: 12, fontWeight: '700' },
   tabs: { flexDirection: 'row', backgroundColor: '#EBEFEC', padding: 4, borderRadius: 15, marginTop: 18, marginBottom: 18 }, tab: { flex: 1, minHeight: 43, alignItems: 'center', justifyContent: 'center', borderRadius: 12 }, tabSelected: { backgroundColor: '#FFFFFF' }, tabText: { color: '#707974', fontWeight: '800' }, tabTextSelected: { color: colors.green },
   statsTitleRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }, statsDate: { color: colors.ink, fontSize: 17, fontWeight: '900' },
